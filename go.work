@@ -2,6 +2,9 @@ go 1.19
 
 use (
 	./calendarDemo
+	./cobraDemo
+	./compress
 	./jwtDemo
+	./socks5Demo
 	./zipDemo
 )

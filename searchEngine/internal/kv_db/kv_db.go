@@ -1,5 +1,12 @@
 package kvdb
 
+import (
+	"os"
+	"strings"
+
+	"github.com/qiancijun/trash/searchEngine/util"
+)
+
 const (
 	BOLT = iota
 	BADGER
@@ -20,6 +27,28 @@ type IKeyValueDB interface {
 	Close() error
 }
 
-func GetKvDB() (IKeyValueDB, error) {
-	return nil, nil
+func GetKvDB(dbtype int, path string) (IKeyValueDB, error) {
+	paths := strings.Split(path, "/")
+	parentPath := strings.Join(paths[0:len(paths)-1], "/")
+
+	info, err := os.Stat(parentPath)
+	if os.IsNotExist(err) {
+		util.Log.Printf("create dir %s", parentPath)
+		os.MkdirAll(parentPath, os.ModePerm)
+	} else {
+		if info.Mode().IsRegular() {
+			util.Log.Printf("%s is a regular file, will delete it", parentPath)
+			os.Remove(parentPath)
+		}
+	}
+
+	var db IKeyValueDB
+	switch dbtype {
+	case BADGER:
+		db = new(Badger).WithDataPath(path)
+	default:
+		db = new(Bolt).WithDataPath(path).WithBucket("cheryl")
+	}
+	err = db.Open()
+	return db, err
 }

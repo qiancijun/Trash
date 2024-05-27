@@ -1,7 +1,6 @@
 package test
 
 import (
-	"fmt"
 	"testing"
 
 	kvdb "github.com/qiancijun/trash/searchEngine/internal/kv_db"
@@ -41,8 +40,12 @@ func TestBadger(t *testing.T) {
 }
 
 func TestGetDbPath(t *testing.T) {
-	setup(t)
-	defer teardown()
+	db, err := kvdb.GetKvDB(kvdb.BOLT, util.RootPath + "data/bolt_db")
+	assert.NoError(t, err)
+	assert.NotNil(t, db)
+	defer func() {
+		db.Close()
+	}()
 	p := db.GetDbPath()
 	assert.Equal(t, util.RootPath + "data/bolt_db", p)
 }

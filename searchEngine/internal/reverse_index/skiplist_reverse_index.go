@@ -112,3 +112,24 @@ onFlag uint64, offFlag uint64, orFlags []uint64) *skiplist.SkipList {
 	}
 	return nil
 }
+
+// 搜索，返回 docID
+func (indexer SkipListReverseIndex) Search(
+	query *types.TermQuery,
+	onFlag uint64,
+	offFlag uint64,
+	orFlags []uint64,
+) []string {
+	result := indexer.search(query, onFlag, offFlag, orFlags)
+	if result == nil {
+		return nil
+	}
+	arr := make([]string, 0, result.Len())
+	node := result.Front()
+	for node != nil {
+		skv, _ := node.Value.(SkipListValue)
+		arr = append(arr, skv.Id)
+		node = node.Next()
+	}
+	return arr
+}

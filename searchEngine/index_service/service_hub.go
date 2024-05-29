@@ -25,6 +25,7 @@ type ServiceHub struct {
 var (
 	serviceHub *ServiceHub
 	hubOnce    sync.Once
+	_ IServiceHub = (*ServiceHub)(nil)
 )
 
 func GetServiceHub(etcdServers []string, heartbeanFreqency int64) *ServiceHub {
@@ -77,4 +78,43 @@ func (hub *ServiceHub) Regist(service string, endpoint string, leaseID etcdv3.Le
 			return leaseID, nil
 		}
 	}
+}
+
+// 注销服务
+func (hub *ServiceHub) UnRegist(service string, endpoint string) error {
+	ctx := context.Background()
+	key := strings.TrimRight(SERVICE_ROOT_PATH, "/") + "/" + service + "/" + endpoint
+	if _, err := hub.client.Delete(ctx, key); err != nil {
+		util.Log.Printf("注销服务%s对应的节点%s失败: %v", service, endpoint, err)
+		return err
+	} else {
+		util.Log.Printf("注销服务%s对应的节点%s", service, endpoint)
+		return nil
+	}
+}
+
+func (hub *ServiceHub) GetServiceEndpoints(service string) []string {
+	ctx := context.Background()
+	prefix := strings.TrimRight(SERVICE_ROOT_PATH, "/") + "/" + service + "/"
+	if resp, err := hub.client.Get(ctx, prefix, etcdv3.WithPrefix()); err != nil {
+		util.Log.Printf("获取服务%s节点失败: %v", service, err)
+		return nil
+	} else {
+		endpoints := make([]string, 0, len(resp.Kvs))
+		for _, kv := range resp.Kvs {
+			path := strings.Split(string(kv.Key), "/")
+			endpoints = append(endpoints, path[len(path) - 1])
+		}
+		return endpoints
+	}
+}
+
+// 负载均衡
+func (hub *ServiceHub) GetServiceEndpoint(service string) string {
+	return hub.loadBalancer.Take(hub.GetServiceEndpoints(service))
+}
+
+// 关闭 etcd client
+func (hub *ServiceHub) Close() {
+	hub.client.Close()
 }

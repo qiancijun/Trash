@@ -35,6 +35,7 @@ func (service *IndexServiceWorker) Regist(etcdServers []string, servicePort int)
 		if err != nil {
 			panic(err)
 		}
+		selfLocalIp = "127.0.0.1" // 单机模拟分布式，把 IP 地址写死
 		service.selfAddr = fmt.Sprintf("%s:%d", selfLocalIp, servicePort)
 		var heartBeat int64 = 3
 		hub := GetServiceHub(etcdServers, heartBeat)

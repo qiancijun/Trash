@@ -4,17 +4,19 @@ import (
 	"errors"
 	"sync/atomic"
 
-	"github.com/boltdb/bolt"
+	bolt "go.etcd.io/bbolt"
 )
 
-var ErrNoData = errors.New("no")
+var ErrNoData = errors.New("no data")
 
+// Bolt bolt store struct
 type Bolt struct {
-	db *bolt.DB
-	path string
+	db     *bolt.DB
+	path   string
 	bucket []byte
 }
 
+// Builder模式
 func (s *Bolt) WithDataPath(path string) *Bolt {
 	s.path = path
 	return s
@@ -25,6 +27,7 @@ func (s *Bolt) WithBucket(bucket string) *Bolt {
 	return s
 }
 
+// OpenBolt open Bolt store
 func (s *Bolt) Open() error {
 	DataDir := s.GetDbPath()
 	db, err := bolt.Open(DataDir, 0o600, bolt.DefaultOptions)
@@ -33,7 +36,7 @@ func (s *Bolt) Open() error {
 	}
 	err = db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists(s.bucket)
-        return err
+		return err
 	})
 	if err != nil {
 		db.Close()

@@ -1,6 +1,7 @@
 package types
 
 type ArxivItem struct {
+	ListTitle string `json:"list_title" selector:"div.is-marginless > p > a"`
 	ArxivLink string `json:"arxivLink" selector:"div.is-marginless > p.list-title > a"`
 	Title string `json:"title" selector:"p.title"`
 	Authors []string `json:"authors" selector:"p.authors a"`

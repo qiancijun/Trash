@@ -5,6 +5,7 @@ import (
 	"log"
 	"strings"
 
+	// "github.com/bytedance/sonic"
 	"github.com/gocolly/colly/v2"
 	"github.com/qiancijun/Trash/arxivScrab/types"
 	"github.com/qiancijun/Trash/arxivScrab/util"
@@ -63,16 +64,10 @@ func (s *ArxivScrab) Init() error {
 	s.collector = colly.NewCollector(
 		colly.AllowedDomains(s.domains...),
 	)
-	if err := s.collector.SetStorage(s.db); err != nil {
-		return err
-	}
-	// 初始化数据存储数据库
-	if sqlite, err := NewSqlite3(util.RootPath + "data/data.sqlite"); err != nil {
-		return err
-	} else {
-		log.Printf("init sqlite database successfully")
-		s.sqlite = sqlite
-	}
+	// if err := s.collector.SetStorage(s.db); err != nil {
+	// 	return err
+	// }
+
 	s.collector.OnError(func(r *colly.Response, err error) {
 		log.Printf("colly has error: %v", err)
 	})
@@ -86,9 +81,13 @@ func (s *ArxivScrab) Init() error {
 		arxiv.Abstract = abstracts[0]
 		dates := strings.Split(strings.TrimSpace(arxiv.Date), "\n")
 		arxiv.Date = dates[0]
-
+		// if str, err := sonic.MarshalString(arxiv); err != nil {
+		// 	log.Printf("unmarshal arxiv failed: %s", err)
+		// } else {
+		// 	log.Printf("arxiv item: %s", str)
+		// }
 		// 写入本地数据库
-		if tx := s.sqlite.Save(arxiv); tx.Error != nil {
+		if tx := s.sqlite.Create(arxiv); tx.Error != nil {
 			log.Printf("write to sqlite error: %v", tx.Error)
 		}
 	})
@@ -99,6 +98,7 @@ func (s *ArxivScrab) Run() error {
 	// 构造 URL
 	keywords := strings.Join(s.keywords, " ")
 	s.url = fmt.Sprintf("%s?query=%s&searchtype=%s&source=header", baseUrl, keywords, s.searchType)
+	log.Printf("fetch url %s", s.url)
 	return s.collector.Visit(s.url)
 }
 

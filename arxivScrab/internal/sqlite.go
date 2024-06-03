@@ -19,8 +19,10 @@ func NewSqlite3(path string) (*gorm.DB, error) {
 		return nil, err
 	}
 	// 自动创建表
-	if !tableCheck(db, "arxiv_items") {
-		db.AutoMigrate(&types.ArxivItem{})
+	if !db.Migrator().HasTable(&types.ArxivItem{}) {
+		if err := db.AutoMigrate(&types.ArxivItem{}); err != nil {
+			return nil, err
+		}
 	}
 	return db, nil
 }

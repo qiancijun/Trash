@@ -31,3 +31,14 @@ func TestArxivRun(t *testing.T) {
 	err := scrab.Run()
 	assert.NoError(t, err)
 }
+
+// 测试多次爬取一个 URL，结果不重复
+func TestMultiRun(t *testing.T) {
+	scrab := initArxivScrab(t)
+	err := scrab.Run()
+	assert.NoError(t, err)
+
+	err = scrab.Run()
+	assert.NoError(t, err)
+
+}

@@ -38,8 +38,7 @@ func GetBoltStorage(path string) (*BoltStorage, error) {
 		}
 	}
 	db := new(BoltStorage).WithDataPath(path).WithBucket("arxiv")
-	err = db.Init()
-	return db, err
+	return db, nil
 }
 
 func (b *BoltStorage) WithDataPath(path string) *BoltStorage {
@@ -95,6 +94,7 @@ func (b *BoltStorage) Close() error {
 
 func (b *BoltStorage) Visited(requestId uint64) error {
 	key := strconv.Itoa(int(requestId))
+	log.Printf("BoltStorage 写入数据 %d", requestId)
 	return b.Set([]byte(key), []byte(key))
 }
 

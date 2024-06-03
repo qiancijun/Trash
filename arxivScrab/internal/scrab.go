@@ -64,9 +64,9 @@ func (s *ArxivScrab) Init() error {
 	s.collector = colly.NewCollector(
 		colly.AllowedDomains(s.domains...),
 	)
-	// if err := s.collector.SetStorage(s.db); err != nil {
-	// 	return err
-	// }
+	if err := s.collector.SetStorage(s.db); err != nil {
+		return err
+	}
 
 	s.collector.OnError(func(r *colly.Response, err error) {
 		log.Printf("colly has error: %v", err)

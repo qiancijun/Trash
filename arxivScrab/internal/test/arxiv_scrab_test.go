@@ -28,17 +28,16 @@ func TestArxivInit(t *testing.T) {
 
 func TestArxivRun(t *testing.T) {
 	scrab := initArxivScrab(t)
-	err := scrab.Run()
+	err := scrab.Run(0)
 	assert.NoError(t, err)
 }
 
 // 测试多次爬取一个 URL，结果不重复
 func TestMultiRun(t *testing.T) {
 	scrab := initArxivScrab(t)
-	err := scrab.Run()
+	err := scrab.Run(0)
 	assert.NoError(t, err)
 
-	err = scrab.Run()
-	assert.NoError(t, err)
-
+	err = scrab.Run(0)
+	assert.Error(t, err, "URL already visited")
 }

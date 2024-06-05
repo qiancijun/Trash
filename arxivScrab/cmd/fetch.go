@@ -41,7 +41,7 @@ var fetchCmd = &cobra.Command{
 			fmt.Printf("GetArxivScrab error: %v\n", err)
 			return
 		}
-		scrab.WithKeywords(keywords...).WithDomains(domains...).WithSearchType(searchType).WithBar(bar)
+		scrab.WithKeywords(keywords...).WithDomains(domains...).WithSearchType(searchType).WithBar(bar).WithEmails(emails...)
 		err = scrab.Init()
 		if err != nil {
 			fmt.Printf("Init error: %v\n", err)
@@ -49,11 +49,9 @@ var fetchCmd = &cobra.Command{
 		}
 
 		for i := 0; i < page; i++ {
-			scrab.Wg.Add(1)
-			scrab.Run(i * 50)
+			scrab.Run((i - 1) * 50)
 		}
 		// wait async fetch finish
-		scrab.Wg.Wait()
 		scrab.Wait()
 	},
 }
@@ -62,6 +60,6 @@ func init() {
 	fetchCmd.Flags().StringArrayVarP(&keywords, "keywords", "k", []string{}, "指定论文关键字")
 	fetchCmd.Flags().StringArrayVarP(&domains, "domains", "", []string{"arxiv.org"}, "指定爬虫域名，一般不需要额外填写")
 	fetchCmd.Flags().StringVarP(&searchType, "search-type", "t", "all", "指定搜索类型")
-	fetchCmd.Flags().IntVarP(&page, "page", "p", 0, "指定页数")
+	fetchCmd.Flags().IntVarP(&page, "page", "p", 1, "指定页数")
 	fetchCmd.Flags().StringArrayVarP(&emails, "emails", "e", []string{}, "emails")
 }

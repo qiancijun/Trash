@@ -1,8 +1,6 @@
 package internal
 
 import (
-	"fmt"
-
 	"github.com/qiancijun/Trash/arxivScrab/types"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -25,13 +23,4 @@ func NewSqlite3(path string) (*gorm.DB, error) {
 		}
 	}
 	return db, nil
-}
-
-func tableCheck(db *gorm.DB, schema string) bool {
-	tx := db.Exec(fmt.Sprintf("SELECT COUNT(1) FROM %s", schema))
-	if tx.Error == nil {
-		return true
-	} else {
-		return false
-	}
 }

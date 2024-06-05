@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Arxiv</title>
+</head>
+<body>
+    <table>
+        {{ range . }}
+            <tr class="item">
+                <!-- https://arxiv.org/abs/2406.02514 -->
+                <td><a href="https://arxiv.org/abs/{{.ArxivLink | GetTag}}">{{ .ArxivLink }}</a></td>
+                <td>{{ .Title }}</td>
+                <td>{{ .Authors | Concat }}</td>
+                <td>{{ .Abstract }}</td>
+                <td>{{ .Date }}</td>
+                <td>{{ .Comments }}</td>
+            </tr>
+        {{ end }}
+    </table>
+</body>
+</html>
+
+<style>
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    table, th, td {
+        border: 1px solid black;
+    }
+
+    th, td {
+        padding: 8px;
+        text-align: left;
+    }
+
+    /* 奇数行背景颜色 */
+    tr:nth-child(odd) {
+        background-color: #f2f2f2;
+    }
+
+    /* 偶数行背景颜色 */
+    tr:nth-child(even) {
+        background-color: #ffffff;
+    }
+
+    th {
+        background-color: #4CAF50;
+        color: white;
+    }
+</style>

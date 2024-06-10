@@ -12,7 +12,6 @@ func initArxivScrab(t *testing.T) *internal.ArxivScrab {
 	assert.NoError(t, err)
 	assert.NotNil(t, arxivScrab)
 	arxivScrab.WithDomains("arxiv.org").WithSearchType("all").WithKeywords("Graph")
-	err = arxivScrab.Init()
 	assert.NoError(t, err)
 	return arxivScrab
 }
@@ -22,7 +21,6 @@ func TestArxivInit(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, arxivScrab)
 	arxivScrab.WithDomains("arxiv.org").WithSearchType("all").WithKeywords("Graph")
-	err = arxivScrab.Init()
 	assert.NoError(t, err)
 }
 

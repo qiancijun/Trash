@@ -14,6 +14,7 @@ import (
 	"github.com/qiancijun/Trash/arxivScrab/types"
 	"github.com/qiancijun/Trash/arxivScrab/util"
 	"github.com/vbauerster/mpb/v8"
+	"github.com/vbauerster/mpb/v8/decor"
 	"gopkg.in/gomail.v2"
 	"gorm.io/gorm"
 )
@@ -79,14 +80,13 @@ const (
 )
 
 type ArxivScrab struct {
-	collector  *colly.Collector
 	sqlite     *gorm.DB
 	keywords   []string
 	searchType string
 	domains    []string
 	emails     []string // email delivery mapping
 	url        string
-	bar        *mpb.Bar // fetch progress bar
+	progress   *mpb.Progress // fetch progress bar
 	cache      []types.ArxivItem
 
 	Wg sync.WaitGroup
@@ -101,6 +101,7 @@ func GetArxivScrab() (*ArxivScrab, error) {
 	scrab.sqlite = sqliteDb
 	scrab.Wg = sync.WaitGroup{}
 	scrab.cache = make([]types.ArxivItem, 0)
+	scrab.progress = mpb.New()
 	return scrab, nil
 }
 
@@ -123,11 +124,6 @@ func (s *ArxivScrab) WithDomains(domains ...string) *ArxivScrab {
 	return s
 }
 
-func (s *ArxivScrab) WithBar(bar *mpb.Bar) *ArxivScrab {
-	s.bar = bar
-	return s
-}
-
 func (s *ArxivScrab) WithEmails(emails ...string) *ArxivScrab {
 	if len(emails) > 0 {
 		s.emails = append(s.emails, emails...)
@@ -135,66 +131,41 @@ func (s *ArxivScrab) WithEmails(emails ...string) *ArxivScrab {
 	return s
 }
 
-func (s *ArxivScrab) Init() error {
-	s.collector = colly.NewCollector(
-		colly.AllowedDomains(s.domains...),
-		colly.Async(true),
-	)
-	s.collector.Limit(&colly.LimitRule{
-		Parallelism: 1,
-	})
-	// 不需要本地缓存，每天爬取最新的都是同一个 url
-	// if err := s.collector.SetStorage(&SqliteStorage{}); err != nil {
-	// 	return err
-	// }
-
-	s.collector.OnError(func(r *colly.Response, err error) {
-		log.Printf("colly has error: %v", err)
-		s.Wg.Done()
-	})
-	s.collector.OnHTML("ol li.arxiv-result", func(h *colly.HTMLElement) {
-		var arxiv types.ArxivItem
-		if err := h.Unmarshal(&arxiv); err != nil {
-			log.Printf("unmarshal arxiv failed: %v", err)
-			return
-		}
-		abstracts := strings.Split(strings.TrimSpace(arxiv.Abstract), "\n")
-		arxiv.Abstract = abstracts[0]
-		dates := strings.Split(strings.TrimSpace(arxiv.Date), "\n")
-		arxiv.Date = dates[0]
-		// if str, err := sonic.MarshalString(arxiv); err != nil {
-		// 	log.Printf("unmarshal arxiv failed: %s", err)
-		// } else {
-		// 	log.Printf("arxiv item: %s", str)
-		// }
-		// 写入本地数据库
-		if s.bar != nil {
-			s.bar.Increment()
-		}
-		tx := s.sqlite.Create(arxiv)
-		if tx.RowsAffected > 0 {
-			s.cache = append(s.cache, arxiv)
-		}
-	})
-	s.collector.OnScraped(func(r *colly.Response) {
-		s.Wg.Done()
-	})
-	return nil
-}
 
 func (s *ArxivScrab) Run(offset int) error {
 	// 构造 URL
-	keywords := strings.Join(s.keywords, " ")
-	s.url = fmt.Sprintf("%s?query=%s&searchtype=%s&source=header&start=%d", baseUrl, keywords, s.searchType, offset)
-	log.Printf("fetch url %s", s.url)
+	keywords := strings.Join(s.keywords, "+")
+	url := fmt.Sprintf("%s?query=%s&searchtype=%s&source=header&start=%d", baseUrl, keywords, s.searchType, offset)
+	log.Printf("fetch url %s", url)
+
+	bar, err := s.progress.Add(
+		int64(0),
+		mpb.BarStyle().Lbound("╢").Filler("▌").Tip("▌").Padding("░").Rbound("╟").Build(),
+		mpb.PrependDecorators(
+			// display our name with one space on the right
+			decor.Name("Fetch Progress", decor.WC{C: decor.DindentRight | decor.DextraSpace}),
+			// replace ETA decorator with "done" message, OnComplete event
+			decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "done"),
+		),
+		mpb.AppendDecorators(decor.Percentage()),
+	)
+	if err != nil {
+		return err
+	}
+	collector := colly.NewCollector(
+		colly.AllowedDomains(s.domains...),
+	)
+	
 	s.Wg.Add(1)
-	return s.collector.Visit(s.url)
+	go s.run(url, collector, bar)
+
+	return nil
 }
 
 func (s *ArxivScrab) Wait() {
 	s.Wg.Wait()
-	if s.bar != nil {
-		s.bar.Wait()
+	if s.progress != nil {
+		s.progress.Wait()
 	}
 	// wait all data fetch finished
 	// send emails
@@ -264,4 +235,49 @@ func (s *ArxivScrab) sendEmail(dest string, wg *sync.WaitGroup) error {
 		return err
 	}
 	return nil
+}
+
+func (s *ArxivScrab) run(url string, collector *colly.Collector, bar *mpb.Bar) {
+	cnt := int64(0)
+	collector.Limit(&colly.LimitRule{
+		Parallelism: 1,
+	})
+	collector.OnHTML("div.content > ol", func(h *colly.HTMLElement) {
+		liCount := h.ChildTexts("li")
+		cnt = int64(len(liCount))
+		bar.SetTotal(cnt, false)
+	})
+	collector.OnError(func(r *colly.Response, err error) {
+		log.Printf("colly has error: %v", err)
+		bar.Abort(false)
+		s.Wg.Done()
+	})
+	collector.OnHTML("ol li.arxiv-result", func(h *colly.HTMLElement) {
+		var arxiv types.ArxivItem
+		if err := h.Unmarshal(&arxiv); err != nil {
+			log.Printf("unmarshal arxiv failed: %v", err)
+			return
+		}
+		abstracts := strings.Split(strings.TrimSpace(arxiv.Abstract), "\n")
+		arxiv.Abstract = abstracts[0]
+		dates := strings.Split(strings.TrimSpace(arxiv.Date), "\n")
+		arxiv.Date = dates[0]
+		// 写入本地数据库
+		if bar != nil {
+			bar.Increment()
+		}
+		tx := s.sqlite.Create(arxiv)
+		if tx.RowsAffected > 0 {
+			s.cache = append(s.cache, arxiv)
+		}
+	})
+	collector.OnScraped(func(r *colly.Response) {
+		s.Wg.Done()
+		bar.SetTotal(cnt, true)
+	})
+	err := collector.Visit(url)
+	if err != nil {
+		bar.Abort(false)
+		log.Printf("fetch data error: %s", err)
+	}
 }

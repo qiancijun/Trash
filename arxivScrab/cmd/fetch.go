@@ -5,8 +5,6 @@ import (
 
 	"github.com/qiancijun/Trash/arxivScrab/internal"
 	"github.com/spf13/cobra"
-	"github.com/vbauerster/mpb/v8"
-	"github.com/vbauerster/mpb/v8/decor"
 )
 
 var (
@@ -23,26 +21,12 @@ var fetchCmd = &cobra.Command{
 	Long:  "fetch daily arxiv data to email",
 	Run: func(cmd *cobra.Command, args []string) {
 		// 创建一个进度条
-		pb := mpb.New(mpb.WithWidth(64))
-		bar := pb.New(
-			int64(page*50),
-			mpb.BarStyle().Lbound("╢").Filler("▌").Tip("▌").Padding("░").Rbound("╟"),
-			mpb.PrependDecorators(
-				// display our name with one space on the right
-				decor.Name("Fetch Progress", decor.WC{C: decor.DindentRight | decor.DextraSpace}),
-				// replace ETA decorator with "done" message, OnComplete event
-				decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "done"),
-			),
-			mpb.AppendDecorators(decor.Percentage()),
-		)
-
 		scrab, err := internal.GetArxivScrab()
 		if err != nil {
 			fmt.Printf("GetArxivScrab error: %v\n", err)
 			return
 		}
-		scrab.WithKeywords(keywords...).WithDomains(domains...).WithSearchType(searchType).WithBar(bar).WithEmails(emails...)
-		err = scrab.Init()
+		scrab.WithKeywords(keywords...).WithDomains(domains...).WithSearchType(searchType).WithEmails(emails...)
 		if err != nil {
 			fmt.Printf("Init error: %v\n", err)
 			return

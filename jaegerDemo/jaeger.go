@@ -1,0 +1,3 @@
+package jaegerdemo
+
+func NewJaegerTracer

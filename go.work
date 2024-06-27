@@ -4,6 +4,7 @@ use (
 	./arxivScrab
 	./calendarDemo
 	./compress
+	./jaegerDemo
 	./jwtDemo
 	./searchEngine
 	./socks5Demo

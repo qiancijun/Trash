@@ -33,7 +33,7 @@ var fetchCmd = &cobra.Command{
 		}
 
 		for i := 0; i < page; i++ {
-			scrab.Run((i - 1) * 50)
+			scrab.Run(i * 50)
 		}
 		// wait async fetch finish
 		scrab.Wait()

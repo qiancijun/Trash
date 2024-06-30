@@ -1,6 +1,7 @@
 package jaegerdemo
 
 import (
+	"context"
 	"io"
 	"log"
 	"time"
@@ -9,6 +10,13 @@ import (
 	"github.com/uber/jaeger-client-go"
 	jaegercfg "github.com/uber/jaeger-client-go/config"
 	"github.com/uber/jaeger-lib/metrics"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 )
 
 func NewJaegerTracer(serviceName string, jaegerHost string) (tracer opentracing.Tracer, closer io.Closer, err error) {
@@ -33,4 +41,39 @@ func NewJaegerTracer(serviceName string, jaegerHost string) (tracer opentracing.
 		log.Printf("Could not initialize jaeger tracer: %s", err.Error())
 	}
 	return
+}
+
+func NewJaegerTracer2() *trace.TracerProvider {
+	headers := map[string]string{
+		"content-type": "application/json",
+	}
+
+	exporter, err := otlptrace.New(
+		context.Background(),
+		otlptracehttp.NewClient(
+			otlptracehttp.WithEndpoint("localhost:4318"),
+			otlptracehttp.WithHeaders(headers),
+			otlptracehttp.WithInsecure(),
+		),
+	)
+	if err != nil {
+		panic(err)
+	}
+	tracerprovider := trace.NewTracerProvider(
+		trace.WithBatcher(
+			exporter,
+			trace.WithMaxExportBatchSize(trace.DefaultMaxExportBatchSize),
+			trace.WithBatchTimeout(trace.DefaultScheduleDelay*time.Millisecond),
+			trace.WithMaxExportBatchSize(trace.DefaultMaxExportBatchSize),
+		),
+		trace.WithResource(
+			resource.NewWithAttributes(
+				semconv.SchemaURL,
+				semconv.ServiceNameKey.String("product-app"),
+			),
+		),
+	)
+
+	otel.SetTracerProvider(tracerprovider)
+	return tracerprovider
 }

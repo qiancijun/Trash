@@ -6,6 +6,7 @@ use (
 	./compress
 	./jaegerDemo
 	./jwtDemo
+	./rpcDemo
 	./searchEngine
 	./socks5Demo
 	./zipDemo

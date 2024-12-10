@@ -32,11 +32,11 @@ func NewGobCodec(conn io.ReadWriteCloser) Codec {
 }
 
 func (c *GobCodec) ReadHeader(h *Header) error {
-	return nil
+	return c.dec.Decode(h)
 }
 
 func (c *GobCodec) ReadBody(body interface{}) error {
-	return nil
+	return c.dec.Decode(body)
 }
 
 func (c *GobCodec) Write(h *Header, body interface{}) (err error) {
@@ -61,3 +61,4 @@ func (c *GobCodec) Write(h *Header, body interface{}) (err error) {
 func (c *GobCodec) Close() error {
 	return c.conn.Close()
 }
+

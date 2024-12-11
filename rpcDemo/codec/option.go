@@ -1,5 +1,7 @@
 package codec
 
+import "errors"
+
 const MagicNumber = 0x3bef5c
 
 /**
@@ -23,4 +25,19 @@ type Option struct {
 var DefaultOption = &Option{
 	MagicNumber: MagicNumber,
 	CodecType:   GobType,
+}
+
+func ParseOptions(opts ...*Option) (*Option, error) {
+	if len(opts) == 0 || opts[0] == nil {
+		return DefaultOption, nil
+	}
+	if len(opts) != 1 {
+		return nil, errors.New("number of options is more than 1")
+	}
+	opt := opts[0]
+	opt.MagicNumber = DefaultOption.MagicNumber
+	if opt.CodecType == "" {
+		opt.CodecType = DefaultOption.CodecType
+	}
+	return opt, nil
 }

@@ -1,13 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
+	"sync"
 	"time"
 
-	"github.com/qiancijun/rpcDemo/codec"
+	rpcClient "github.com/qiancijun/rpcDemo/rpc_client"
 	rpcServer "github.com/qiancijun/rpcDemo/rpc_server"
 )
 
@@ -25,26 +25,22 @@ func main() {
 	addr := make(chan string)
 	go startServer(addr)
 
-	// 一个简单的 client
-	conn, _ := net.Dial("tcp", <-addr)
-	defer func() { _ = conn.Close() }()
+	client, _ := rpcClient.Dial("tcp", <-addr)
+	defer func() { _ = client.Close() }()
 
 	time.Sleep(time.Second)
-
-	// 先发送 JSON 编码的 Option
-	_ = json.NewEncoder(conn).Encode(codec.DefaultOption)
-	cc := codec.NewGobCodec(conn)
-
-	// 发送 request 接受 response
+	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
-		h := &codec.Header{
-			ServiceMethod: "Foo.sum",
-			Seq:           uint64(i),
-		}
-		_ = cc.Write(h, fmt.Sprintf("rpc req %d", h.Seq))
-		_ = cc.ReadHeader(h)
-		var reply string
-		_ = cc.ReadBody(&reply)
-		log.Println("reply:", reply)
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			args := fmt.Sprintf("rpc req %d", i)
+			var reply string
+			if err := client.Call("Foo.Sum", args, &reply); err != nil {
+				log.Fatal("call Foo.Sum error", err)
+			}
+			log.Println("reply", reply)
+		}(i)
 	}
+	wg.Wait()
 }

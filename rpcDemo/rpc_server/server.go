@@ -2,14 +2,17 @@ package rpcServer
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/qiancijun/rpcDemo/codec"
+	"github.com/qiancijun/rpcDemo/service"
 )
 
 /**
@@ -19,13 +22,21 @@ import (
 *
 * TODO: 目前还不能判断 body 的类型，因此在 readRequest 和 handleRequest 中
 * 将 body 作为字符串处理。接受到请求，打印 header 并回复 rpc resp
+* 从接收到请求到回复请求的步骤：
+*   1. 根据入参类型, 将请求的 body 反序列化
+*   2. 调用 service.Call 完成方法调用
+*   3. 将 reply 序列化为字节流，构造响应报文
  */
 
-type Server struct{}
+type Server struct {
+	serviceMap sync.Map
+}
 
 type request struct {
 	h            *codec.Header
 	argv, replyv reflect.Value
+	mtype        *service.MethodType
+	svc          *service.Service
 }
 
 func NewServer() *Server {
@@ -36,6 +47,14 @@ var (
 	DefaultServer  = NewServer()
 	invalidRequest = struct{}{}
 )
+
+func (server *Server) Register(rcvr interface{}) error {
+	s := service.NewService(rcvr)
+	if _, dup := server.serviceMap.LoadOrStore(s.Name, s); dup {
+		return errors.New("rpc service already defined: " + s.Name)
+	}
+	return nil
+}
 
 func (server *Server) Accept(lis net.Listener) {
 	for {
@@ -106,9 +125,22 @@ func (server *Server) readRequest(cc codec.Codec) (*request, error) {
 	}
 	req := &request{h: h}
 	// TODO: request argv 类型还不知道
-	req.argv = reflect.New(reflect.TypeOf(""))
-	if err = cc.ReadBody(req.argv.Interface()); err != nil {
+	req.svc, req.mtype, err = server.findService(h.ServiceMethod)
+	if err != nil {
+		return req, err
+	}
+
+	req.argv = req.mtype.NewArgv()
+	req.replyv = req.mtype.NewReply()
+
+	argvi := req.argv.Interface()
+	if req.argv.Type().Kind() != reflect.Ptr {
+		argvi = req.argv.Addr().Interface()
+	}
+
+	if err = cc.ReadBody(argvi); err != nil {
 		log.Println("rpc server: read argv err:", err)
+		return req, err
 	}
 	return req, nil
 }
@@ -123,11 +155,44 @@ func (server *Server) sendResponse(cc codec.Codec, h *codec.Header, body interfa
 
 func (server *Server) handleRequest(cc codec.Codec, req *request, sending *sync.Mutex, wg *sync.WaitGroup) {
 	defer wg.Done()
-	log.Println(req.h, req.argv.Elem())
-	req.replyv = reflect.ValueOf(fmt.Sprintf("rpc resp %d", req.h.Seq))
+	err := req.svc.Call(req.mtype, req.argv, req.replyv)
+	if err != nil {
+		req.h.Error = err.Error()
+		server.sendResponse(cc, req.h, invalidRequest, sending)
+		return
+	}
 	server.sendResponse(cc, req.h, req.replyv.Interface(), sending)
+}
+
+/**
+* 将 Service.Method 分割成两部分。
+* 先从 serviceMap 中找到对应的 service 实例
+* 再从 service 实例的 method 中找到对应的 methodType
+ */
+func (server *Server) findService(serviceMethod string) (svc *service.Service, mtype *service.MethodType, err error) {
+	dot := strings.LastIndex(serviceMethod, ".")
+	if dot < 0 {
+		err = errors.New("rpc server: service/method request ill-formed: " + serviceMethod)
+		return
+	}
+	serviceName, methodName := serviceMethod[:dot], serviceMethod[dot+1:]
+	svci, ok := server.serviceMap.Load(serviceName)
+	if !ok {
+		err = errors.New("rpc server: can't find service " + serviceName)
+		return
+	}
+	svc = svci.(*service.Service)
+	mtype = svc.Method[methodName]
+	if mtype == nil {
+		err = errors.New("rpc server: can't find method " + methodName)
+	}
+	return
 }
 
 func Accept(lis net.Listener) {
 	DefaultServer.Accept(lis)
+}
+
+func Register(rcvr interface{}) error {
+	return DefaultServer.Register(rcvr)
 }
